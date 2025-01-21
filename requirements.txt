@@ -1,0 +1,11 @@
+llama-index
+llama-index-agent-openai-legacy
+llama-index-embeddings-huggingface
+llama-index-embeddings-azure-openai
+llama-index-llms-azure-openai
+llama-index-llms-ollama
+pandas
+openpyxl
+python-dotenv
+Flask
+gliner

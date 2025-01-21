@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Black Box LLM Evaluation</title>
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  />
+  <style>
+    /* Overall styling */
+    body {
+      background-color: #f8f9fa;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      padding: 20px;
+    }
+
+    /* Heading styles */
+    .heading {
+      font-family: "Trebuchet MS", Arial, sans-serif;
+      color: #2c3e50;
+      font-size: 2rem;
+      font-weight: bold;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    .sub-heading {
+      font-size: 1.25rem;
+      color: #495057;
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    /* Link/card/table CSS */
+    .toggle-link {
+      text-decoration: underline;
+      color: #007bff;
+      cursor: pointer;
+    }
+    .toggle-link:hover {
+      color: #0056b3;
+    }
+    .card {
+      margin-top: 20px;
+      border-color: #bbb;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    .table {
+      background-color: #ffffff;
+      border: 1px solid #ccc;
+    }
+    thead th {
+      background-color: #eaecef;
+      font-weight: bold;
+      text-transform: uppercase;
+      color: #2c3e50;
+    }
+    .table-hover tbody tr:hover {
+      background-color: #f3f5f6;
+    }
+
+    /* Force fixed layout & horizontal scroll if needed */
+    .table-fixed {
+      table-layout: fixed;
+      width: 100%;
+    }
+    .table-responsive {
+      overflow-x: auto; /* enable horizontal scrolling */
+    }
+
+    /* Cell content can wrap up to 3 lines, then scroll */
+    .cell-content {
+      display: block;
+      white-space: normal;
+      max-height: 4.5em; /* ~3 lines if line-height=1.5 */
+      overflow-y: auto;
+      line-height: 1.5;
+      padding: 0.5rem;
+      word-wrap: break-word;
+    }
+    #loader {
+      margin-top: 20px;
+    }
+
+    /* Score styling (table cells) */
+    .score-high {
+      background-color: #d4edda !important; /* light green */
+      color: #155724 !important;           /* dark green */
+      font-weight: bold;
+    }
+    .score-medium {
+      background-color: #fff3cd !important; /* light yellow */
+      color: #856404 !important;           /* dark yellow */
+      font-weight: bold;
+    }
+    .score-low {
+      background-color: #f8d7da !important; /* light red */
+      color: #721c24 !important;           /* dark red */
+      font-weight: bold;
+    }
+
+    /* Score styling (text) */
+    .final-score-text-high {
+      background-color: #d4edda;
+      color: #155724;
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+    .final-score-text-medium {
+      background-color: #fff3cd;
+      color: #856404;
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+    .final-score-text-low {
+      background-color: #f8d7da;
+      color: #721c24;
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1 class="heading">Black Box LLM Evaluation</h1>
+  <p class="sub-heading">
+    Select one or more conversations and a simulation to evaluate their performance.
+  </p>
+
+  <!-- EVALUATION FORM -->
+  <form id="evaluation-form">
+    <div class="row">
+        <!-- Single simulation select -->
+      <div class="col-md-6 mb-3">
+        <label for="simulation" class="form-label">Select Simulation:</label>
+        <select id="simulation" name="simulation_id" class="form-select">
+          <option value="">Select a simulation...</option>
+        </select>
+        <!-- Toggle link to show/hide simulation steps -->
+        <p id="selected-simulation" class="mt-2 toggle-link" style="display: none;">
+          Show Selected Simulation Steps
+        </p>
+      </div>
+      <!-- MULTI-SELECT for conversations -->
+      <div class="col-md-6 mb-3">
+        <label for="conversation" class="form-label">Select Conversation(s):</label>
+        <select
+          id="conversation"
+          name="conversation_id[]"
+          class="form-select"
+          multiple
+          size="5"
+        >
+          <!-- Options loaded dynamically from /api/conversations -->
+        </select>
+        <!-- We'll place "Show Logs" buttons here for each selected conversation -->
+        <div id="conversation-buttons" style="margin-top:1rem;"></div>
+      </div>
+
+      
+    </div>
+    <div class="text-center">
+      <!-- Evaluate triggers form submit -->
+      <button type="submit" class="btn btn-primary" id="evaluate-button" disabled>
+        Evaluate
+      </button>
+    </div>
+  </form>
+
+  <!-- Container for conversation log cards -->
+  <div id="conversation-logs-container"></div>
+
+  <!-- Simulation steps card -->
+  <div id="simulation-details" class="card mt-3" style="display: none;">
+    <div class="card-body">
+      <h5 class="card-title">Selected Simulation Steps</h5>
+      <div class="table-responsive">
+        <table class="table table-bordered table-fixed table-hover">
+          <thead>
+            <tr>
+              <th>Step Name</th>
+              <th>Trigger Event</th>
+              <th>Expected Functions</th>
+              <th>Expected Response</th>
+            </tr>
+          </thead>
+          <tbody id="simulation-details-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loader while evaluating -->
+  <div id="loader" class="text-center" style="display: none;">
+    <div class="spinner-border text-primary" role="status"></div>
+    <p>Loading...</p>
+  </div>
+
+  <div class="mt-3">
+    <strong style="font-size: 2rem;">Overall Final Score:</strong>
+    <span style="font-size: 2.3rem;" id="final-score"></span>
+  </div>
+  
+
+  <!-- Evaluation Results -->
+  <div id="results" class="mt-5" style="display: none;">
+    <h4>Evaluation Results</h4>
+    <!-- We'll display each conversation's partial DataFrame & final score here -->
+    <!-- HORIZONTAL SCROLL: wrap in .table-responsive if table is wide -->
+    <div id="evaluation-outcomes" class="table-responsive mt-4"></div>
+  </div>
+</div>
+
+<!-- jQuery -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+  /************************************************
+   * Table column logic
+   ************************************************/
+  function adjustColumnWidths(tableSelector) {
+    const table = typeof tableSelector === "string"
+      ? document.querySelector(tableSelector)
+      : tableSelector;
+    if (!table) return;
+
+    // Remove old colgroup if any
+    const oldColgroup = table.querySelector("colgroup");
+    if (oldColgroup) {
+      oldColgroup.remove();
+    }
+
+    const thead = table.querySelector("thead");
+    if (!thead) return;
+    const headerCells = thead.querySelectorAll("th");
+    const colCount = headerCells.length;
+
+    const rows = table.querySelectorAll("tbody tr");
+    if (!rows.length) return;
+
+    const maxLens = new Array(colCount).fill(0);
+    rows.forEach(row => {
+      const tds = row.querySelectorAll("td");
+      tds.forEach((td, i) => {
+        const text = td.innerText.trim();
+        if (text.length > maxLens[i]) {
+          maxLens[i] = text.length;
+        }
+      });
+    });
+
+    // Build new colgroup, ensuring min width = 250px
+    const colgroup = document.createElement("colgroup");
+    for (let i = 0; i < colCount; i++) {
+      const col = document.createElement("col");
+      // 8 px per char, clamp [250, 300] as an example
+      const pxWidth = Math.max(250, Math.min(300, maxLens[i] * 8));
+      col.style.width = pxWidth + "px";
+      colgroup.appendChild(col);
+    }
+    table.prepend(colgroup);
+  }
+
+  /************************************************
+   * Color-code numeric cells in partial data
+   ************************************************/
+  function colorCodeScoreCell($cell) {
+    let text = $cell.text().trim();
+    if (text.endsWith("%")) {
+      text = text.slice(0, -1);
+    }
+    const scoreVal = parseFloat(text);
+    if (isNaN(scoreVal)) return;
+    if (scoreVal >= 80) {
+      $cell.addClass("score-high");
+    } else if (scoreVal >= 50) {
+      $cell.addClass("score-medium");
+    } else {
+      $cell.addClass("score-low");
+    }
+  }
+
+  /************************************************
+   * Color-code the final score text
+   ************************************************/
+  function colorCodeFinalScore(finalScoreStr) {
+    let scoreVal = String(finalScoreStr).trim();
+    if (scoreVal.endsWith("%")) {
+      scoreVal = scoreVal.slice(0, -1);
+    }
+    const numericVal = parseFloat(scoreVal);
+    if (isNaN(numericVal)) return;
+
+    const $finalScore = $("#final-score");
+    // Remove old classes
+    $finalScore.removeClass("final-score-text-high final-score-text-medium final-score-text-low");
+
+    if (numericVal >= 80) {
+      $finalScore.addClass("final-score-text-high");
+    } else if (numericVal >= 50) {
+      $finalScore.addClass("final-score-text-medium");
+    } else {
+      $finalScore.addClass("final-score-text-low");
+    }
+  }
+
+  /************************************************
+   * Show/Hide conversation logs
+   ************************************************/
+  function buildConversationButtons(selectedConvs) {
+    const $container = $("#conversation-buttons");
+    $container.empty();
+
+    if (!selectedConvs || !selectedConvs.length) return;
+
+    selectedConvs.forEach(cid => {
+      // type="button" so it doesn't submit the form
+      const $btn = $(`
+        <button type="button" class="btn btn-sm btn-secondary me-2">
+          Show ${cid} Logs
+        </button>
+      `);
+      let showingLogs = false;
+
+      $btn.on("click", function() {
+        const cardId = `conv-${cid}-card`;
+        let $card = $(`#${cardId}`);
+        if (!$card.length) {
+          $card = createConversationCard(cid);
+          $("#conversation-logs-container").append($card);
+          fetchConversationLogs(cid, $card);
+        }
+
+        // Toggle show/hide
+        if (showingLogs) {
+          $card.hide();
+          $btn.text(`Show ${cid} Logs`);
+        } else {
+          $card.show();
+          $btn.text(`Hide ${cid} Logs`);
+        }
+        showingLogs = !showingLogs;
+      });
+      $container.append($btn);
+    });
+  }
+
+  function createConversationCard(cid) {
+    const cardId = `conv-${cid}-card`;
+    return $(`
+      <div class="card mt-3" id="${cardId}" style="display:none;">
+        <div class="card-body">
+          <h5 class="card-title">Logs for ${cid}</h5>
+          <div class="table-responsive" style="overflow-x: auto;">
+            <table class="table table-bordered table-fixed table-hover">
+              <thead>
+                <tr>
+                  <th>User Query</th>
+                  <th>Response</th>
+                  <th>Actual Function Calls</th>
+                </tr>
+              </thead>
+              <tbody id="${cardId}-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `);
+  }
+
+  function fetchConversationLogs(cid, $card) {
+    $.get(`/api/conversations/${cid}`, function(data) {
+      if (!data.logs) {
+        alert("No logs found for " + cid);
+        return;
+      }
+      const $tbody = $card.find(`#conv-${cid}-card-body`);
+      let rowsHTML = "";
+      data.logs.forEach(log => {
+        rowsHTML += `<tr>
+          <td><div class="cell-content">${log.user_query || ""}</div></td>
+          <td><div class="cell-content">${log.response || ""}</div></td>
+          <td><div class="cell-content">${
+            (log.actual_function_calls && log.actual_function_calls.length)
+              ? log.actual_function_calls.map(fc => `
+                <b>Function:</b> ${fc.function_name}<br/>
+                <b>Input:</b> ${JSON.stringify(fc.input_passed)}<br/>
+                <b>Output:</b> ${JSON.stringify(fc.output_passed)}
+              `).join("<hr/>")
+              : "No function calls"
+          }</div></td>
+        </tr>`;
+      });
+      $tbody.html(rowsHTML);
+
+      const tableSel = $card.find("table.table-fixed").get(0);
+      adjustColumnWidths(tableSel);
+    }).fail(() => {
+      alert("Could not load conversation logs for " + cid);
+    });
+  }
+
+  /************************************************
+   * Show/Hide simulation steps
+   ************************************************/
+  let simShowing = false;
+  function toggleSimulationSteps(simId) {
+    const $simDetails = $("#simulation-details");
+    if (!simShowing) {
+      // fetch & show
+      fetchSimulationSteps(simId);
+      $simDetails.show();
+      $("#selected-simulation").text("Hide Selected Simulation Steps");
+    } else {
+      // hide
+      $simDetails.hide();
+      $("#selected-simulation").text("Show Selected Simulation Steps");
+    }
+    simShowing = !simShowing;
+  }
+
+  function fetchSimulationSteps(simId) {
+    if (!simId) return;
+    $.get(`/api/simulations/${simId}`, function(data) {
+      if (!data.steps) {
+        alert("No steps found for simulation " + simId);
+        return;
+      }
+      let rowsHTML = "";
+      data.steps.forEach(step => {
+        rowsHTML += `<tr>
+          <td><div class="cell-content">${step.step_name || ""}</div></td>
+          <td><div class="cell-content">${step.trigger_event || ""}</div></td>
+          <td><div class="cell-content">${
+            (step.expected_functions && step.expected_functions.length)
+              ? step.expected_functions.map(fn => `
+                <b>Function:</b> ${fn.function_name}<br/>
+                <b>Input:</b> ${JSON.stringify(fn.input_passed)}
+              `).join("<hr/>")
+              : "No expected functions"
+          }</div></td>
+          <td><div class="cell-content">${step.expected_response || ""}</div></td>
+        </tr>`;
+      });
+      $("#simulation-details-body").html(rowsHTML);
+      const tableEl = $("#simulation-details table.table-fixed").get(0);
+      adjustColumnWidths(tableEl);
+    }).fail(() => {
+      alert("Could not load simulation steps for " + simId);
+    });
+  }
+
+  /************************************************
+   * On Document Ready
+   ************************************************/
+  $(document).ready(function() {
+    // 1) Load conversation IDs
+    $.get("/api/conversations", function(data) {
+      const $conv = $("#conversation");
+      data.forEach(item => {
+        $conv.append(`<option value="${item.id}">${item.name}</option>`);
+      });
+    }).fail(() => {
+      alert("Error loading conversations.");
+    });
+
+    // 2) Load simulation IDs
+    $.get("/api/simulations", function(data) {
+      const $sim = $("#simulation");
+      data.forEach(item => {
+        $sim.append(`<option value="${item.id}">${item.name}</option>`);
+      });
+    }).fail(() => {
+      alert("Error loading simulations.");
+    });
+
+    // Multi-select conversation changes
+    $("#conversation").on("change", function() {
+      const selectedConvs = $(this).val() || [];
+      buildConversationButtons(selectedConvs);
+
+      // Toggle Evaluate
+      const simVal = $("#simulation").val();
+      $("#evaluate-button").prop("disabled", !(selectedConvs.length > 0 && simVal));
+    });
+
+    // Simulation changes
+    $("#simulation").on("change", function() {
+      const selectedConvs = $("#conversation").val() || [];
+      const simVal = $(this).val();
+      // If there's a simulation & at least one conversation, enable Evaluate
+      $("#evaluate-button").prop("disabled", !(selectedConvs.length > 0 && simVal));
+
+      // Show/hide the "Show Selected Simulation Steps" link
+      if (simVal) {
+        $("#selected-simulation").show().text("Show Selected Simulation Steps");
+        simShowing = false; // reset
+        $("#simulation-details").hide();
+      } else {
+        $("#selected-simulation").hide();
+        $("#simulation-details").hide();
+      }
+    });
+
+    // Toggle simulation steps
+    $("#selected-simulation").on("click", function() {
+      const simId = $("#simulation").val();
+      toggleSimulationSteps(simId);
+    });
+
+    // EVALUATION
+    $("#evaluation-form").on("submit", function(e) {
+      e.preventDefault();
+      $("#loader").show();
+      $("#results").hide();
+
+      // Use .serialize() to collect conversation_id[] + simulation_id
+      const formData = $(this).serialize();
+      console.log("Form data:", formData);
+
+      $.post("/evaluate", formData, function(data) {
+        $("#loader").hide();
+        $("#results").show();
+
+        // data => { results: [ { conversation_id, dataframe, final_score }, ... ], overall_final_score }
+        console.log("Evaluation response:", data);
+
+        const $outcomes = $("#evaluation-outcomes");
+        $outcomes.empty(); // clear old results
+
+        if (!data.results || data.results.length === 0) {
+          $outcomes.append("<p>No valid conversations or data returned.</p>");
+          return;
+        }
+
+        // For each conversation, show partial DataFrame & final_score
+        data.results.forEach(item => {
+          const cid = item.conversation_id;
+          const dfHTML = item.dataframe || "";
+          const scoreVal = item.final_score || 0; // numeric or string
+          const steps_in_order = item.steps_in_order
+
+          // Wrap it in .table-responsive for horizontal scrolling
+          const convCard = `
+            <div class="card my-4">
+              <div class="card-body">
+                <h5 class="card-title">Evaluation for ${cid}</h5>
+                <p><strong>Conversation Score:</strong> <span class="conv-score">${scoreVal}</span></p>
+                <p><strong>Steps followed in order:</strong> <span class="steps_in_order">${steps_in_order}</span></p>
+                <div class="table-responsive" style="overflow-x: auto;">
+                  ${dfHTML}
+                </div>
+              </div>
+            </div>
+          `;
+          $outcomes.append(convCard);
+        });
+
+        // color-code partial data
+        $outcomes.find("table").addClass("table table-bordered table-fixed table-hover");
+        $outcomes.find("th, td").each(function() {
+          // wrap if not already
+          if (!$(this).find(".cell-content").length) {
+            const html = $(this).html();
+            $(this).html(`<div class="cell-content">${html}</div>`);
+          }
+        });
+        // color cells
+        $outcomes.find("tbody tr").each(function() {
+          $(this).find("td").each(function() {
+            colorCodeScoreCell($(this));
+          });
+        });
+
+        // Adjust columns for each partial DataFrame
+        $outcomes.find("table.table-fixed").each(function() {
+          adjustColumnWidths(this);
+        });
+
+        // color code final scores for each conversation
+        $outcomes.find(".conv-score").each(function() {
+          let val = $(this).text().trim();
+          if (val.endsWith("%")) {
+            val = val.slice(0, -1);
+          }
+          const numericVal = parseFloat(val);
+          if (!isNaN(numericVal)) {
+            if (numericVal >= 80) {
+              $(this).addClass("final-score-text-high");
+            } else if (numericVal >= 50) {
+              $(this).addClass("final-score-text-medium");
+            } else {
+              $(this).addClass("final-score-text-low");
+            }
+          }
+        });
+
+        // Color code steps_in_order for each conversation based on true or false values
+        $outcomes.find(".steps_in_order").each(function() {
+          let val = $(this).text().trim().toLowerCase();
+          
+          if (val === "true") {
+            $(this).addClass("final-score-text-true");
+          } else if (val === "false") {
+            $(this).addClass("final-score-text-false");
+          } else {
+            // Optionally handle unexpected values
+            $(this).addClass("final-score-text-unknown");
+          }
+        });
+
+
+        // Overall final score
+        const overall = data.overall_final_score || 0;
+        $("#final-score").text(overall);
+        colorCodeFinalScore(overall);
+
+      }).fail(function(xhr) {
+        $("#loader").hide();
+        alert("Error: " + xhr.responseJSON.error);
+      });
+    });
+  });
+</script>
+</body>
+</html>
