@@ -137,7 +137,7 @@
   <form id="evaluation-form">
     <div class="row">
         <!-- Single simulation select -->
-      <div class="col-md-6 mb-3">
+      <div class="col-md-6 mb-6">
         <label for="simulation" class="form-label">Select Simulation:</label>
         <select id="simulation" name="simulation_id" class="form-select">
           <option value="">Select a simulation...</option>
@@ -147,8 +147,28 @@
           Show Selected Simulation Steps
         </p>
       </div>
+      <div class="col-md-6 mb-6">
+        <label for="halucination_threshold" class="form-label">Pass NER Halucination threshold:</label>
+        <input
+          id="halucination_threshold"
+          name="halucination_threshold"
+          class="form-input"
+          type="number"
+          min="0"
+          max="1"
+          step="0.01"
+          placeholder="0.00 - 1.00"
+        />
+      </div>
+      <div class="col-md-6 mb-6">
+      <label for="entitySelect" class="form-label" >Select Entities:</label><br/>
+      <select id="entitySelect" class="form-select" name="entitySelect" multiple size="20">
+        <!-- Options added dynamically by JavaScript -->
+      </select>
+      </div>
+
       <!-- MULTI-SELECT for conversations -->
-      <div class="col-md-6 mb-3">
+      <div class="col-md-6 mb-6">
         <label for="conversation" class="form-label">Select Conversation(s):</label>
         <select
           id="conversation"
@@ -220,6 +240,24 @@
 <!-- jQuery -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
+  /************************************************
+   * fetch NER entities
+   ************************************************/
+  fetch("/api/entities")
+      .then(response => response.json())
+      .then(data => {
+        const selectElement = document.getElementById("entitySelect");
+        // data is expected to be an array of strings
+        data.forEach(entity => {
+          const option = document.createElement("option");
+          option.value = entity;
+          option.textContent = entity;
+          selectElement.appendChild(option);
+        });
+      })
+      .catch(error => {
+        console.error("Error fetching entity list:", error);
+      });
   /************************************************
    * Table column logic
    ************************************************/

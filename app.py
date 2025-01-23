@@ -9,6 +9,7 @@ import os
 from dotenv import load_dotenv
 from config import Config
 from models.gliner_model import GliNerMODEL
+from global_variable import NER_ENTITIES
 
 config = Config()
 app = Flask(__name__)
@@ -26,6 +27,12 @@ llm = LLMModel(
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.route("/api/entities")
+def get_entities():
+    # Example list (in practice, fetch from DB or external source)
+    return jsonify(NER_ENTITIES)
 
 @app.route("/api/conversations", methods=["GET"])
 def get_conversations():
@@ -89,6 +96,12 @@ def evaluate():
         # Retrieve multiple conversation IDs
         conversation_ids = request.form.getlist("conversation_id[]")
         simulation_id = request.form.get("simulation_id")
+        halucination_threshold = request.form.get("halucination_threshold")
+        selected_entities = list(request.form.getlist("entitySelect"))
+        
+        # halucination_threshold=0.7
+        print(f"Got Halucination Threshold :{halucination_threshold}")
+        print(f"Selected NER entities are: {selected_entities}")
 
         # Validate simulation
         simulation = simulations.get(simulation_id)
@@ -114,7 +127,9 @@ def evaluate():
                 simulation_steps=steps,
                 conversation_logs=conversation,
                 llm=llm,
-                gliner_model=GliNerMODEL(config.GLINER_MODEL).model
+                gliner_model=GliNerMODEL(config.GLINER_MODEL).model,
+                halucination_threshold=float(halucination_threshold),
+                ner_entities = selected_entities
             )
             dfs.append(df)
             partial_html = df.to_html(
@@ -144,6 +159,7 @@ def evaluate():
             "overall_final_score": overall_final_score
         })
     except Exception as e:
+        print(f"Got Error: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":

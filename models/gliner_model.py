@@ -132,12 +132,12 @@ def extract_and_check_entities(
 
     # 5. Calculate score
     score = round(matched / total_found, 2) if total_found > 0 else 1
-    print("All context ---> \n",all_context_texts_lower)
+    # print("All context ---> \n",all_context_texts_lower)
     return {
         "total_found": total_found,
         "matched": matched,
         "keywords_extracted": keywords_extracted,
-        "score": score,
+        "score": 1-score,  # must be wetween 0-1
         "keywords_extracted_not_matched":keywords_extracted_not_matches,
         "keywords_extracted_matches": keywords_extracted_matches
     }
