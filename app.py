@@ -1,15 +1,18 @@
 # app.py
 from flask import Flask, render_template, request, jsonify
+from dataclasses import asdict
 import pandas as pd
 from data.demo_data1 import conversations, simulations
 from evaluator import run_llm_evaluator_pipeline_with_validations  
 from llm.llm import LLMModel
 from global_variable import OPENAI_LLM
-import os
-from dotenv import load_dotenv
 from config import Config
 from models.gliner_model import GliNerMODEL
 from global_variable import NER_ENTITIES
+from data_model.conversation import InputConversation
+from conversations.pipeline import ConversationService
+import json
+
 
 config = Config()
 app = Flask(__name__)
@@ -29,6 +32,9 @@ def index():
     return render_template("index.html")
 
 
+########################################################################
+# ------------------- BELOW APIS ARE FOR UI MAINLY ---------------------
+########################################################################
 @app.route("/api/entities")
 def get_entities():
     # Example list (in practice, fetch from DB or external source)
@@ -161,6 +167,26 @@ def evaluate():
     except Exception as e:
         print(f"Got Error: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+
+##############################################################################################
+# ------------------ BELOW APIS ARE FOR EVALUATION AND MAIN FUNCTIONALTY ---------------------
+###############################################################################################
+@app.route("/api/data-preprocessing/format-data", methods=['POST'])
+def format_input_conversation():
+    data = request.get_json()
+    conversation_thread_id = data.get("conversation_thread_id")
+    input_data = data.get("input_data")
+    try:
+        service =  ConversationService()
+        response =  service.get_conversation(input_json=input_data)
+        return asdict(response)
+    except Exception as e:
+        print(f"Got exception for conversation id: {conversation_thread_id}. Exceprion: {e}")
+        return None
+
+
+
 
 if __name__ == "__main__":
     app.run(debug=True)
