@@ -193,7 +193,7 @@ class LLMEvaluation:
         llm_response=None
         try:
             
-            llm_response = self.llm.complete(text="Hello how are you")
+            llm_response = self.llm.complete(text=prompt)
             return self.process_response(llm_response)
         except Exception as e:
             print("[!]    Error in LLM response")
@@ -461,7 +461,7 @@ class LLMEvaluation:
                 "reasoning": reasoning,
                 "is_halucinated": is_halucinated,
                 "correct_response": correct_response,
-                "follow_up_question":follow_up_question
+                "follow_up_question": follow_up_question
             }
         except Exception as e:
             print("[!] Error in processing the LLM response")

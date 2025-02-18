@@ -29,8 +29,7 @@ llm = LLMModel(
     model_source=config.MODEL_SOURCE,
     llm_endpoint=config.LLM_ENDPOINT
 )
-print("3456787654")
-print(llm.complete(text="Hello"))
+
 
 ############################################################################################
 # ------------------------------------Helper Functions--------------------------------------
