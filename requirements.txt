@@ -9,3 +9,6 @@ openpyxl
 python-dotenv
 Flask
 gliner
+flasgger
+marshmallow
+pymongo

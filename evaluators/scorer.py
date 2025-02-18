@@ -5,14 +5,17 @@ class QueryScorer:
     2. Which functions were expected vs. actually called.
     3. Whether there was hallucination or an incorrect response according to the LLM result.
     """
+    def __init__(self, halucination_threshold:float = 0.7):
+        self.halucination_threshold = halucination_threshold
+        if self.halucination_threshold >1 or self.halucination_threshold<0:
+            raise Exception("NER threshold must be between 0-1")
+        
 
     def calculate_score(self, 
                         matched_step: bool,
                         expected_functions_names: list, 
                         actual_functions_names: list, 
-                        llm_result: dict,
-                        ner_halucination_score:float,
-                        halucination_threshold:float=0.7) -> dict:
+                        llm_result: dict) -> dict:
         """
         Calculates the score for a given query response.
 
@@ -38,10 +41,11 @@ class QueryScorer:
         reasoning = ""
         missing_functions = []
         incorrect_functions = []
-        if halucination_threshold >1 or halucination_threshold<0:
-            raise Exception("NER threshold must be between 0-1")
-        if ner_halucination_score>1 or ner_halucination_score<0:
-            raise Exception("NER halucination score must be between 0-1")
+        
+        ner_halucination_score = llm_result.get("ner_score", None)
+        if ner_halucination_score:
+            if ner_halucination_score >1 or ner_halucination_score < 0:
+                raise Exception("NER halucination score must be between 0-1")
 
         print("Scoring the query")
 
@@ -72,10 +76,10 @@ class QueryScorer:
                     incorrect_functions.append(func)
 
             # Apply halucination/correctness checks
-            if ner_halucination_score >= halucination_threshold and not llm_result.get("correct_response"):
+            if ner_halucination_score >= self.halucination_threshold and not llm_result.get("correct_response"):
                 print("Score = 0 since there is hallucination and the response is not correct.")
                 score = 0
-            elif ner_halucination_score >= halucination_threshold:
+            elif ner_halucination_score >= self.halucination_threshold:
                 print(f"Score is halved to {score/2} since there is hallucination.")
                 score = score / 2
             elif not llm_result.get("correct_response"):
@@ -89,7 +93,7 @@ class QueryScorer:
                 is_correct_step_followed = True
                 reasoning = "No steps followed and no functions were called during the query."
                 
-                if ner_halucination_score >= halucination_threshold:
+                if ner_halucination_score >= self.halucination_threshold:
                     print("Score = 0 since no step was followed and it is hallucinated.")
                     score = 0
                 else:

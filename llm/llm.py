@@ -80,7 +80,7 @@ class LLMModel(metaclass=SingletonClass):
                     messages=[
                         {"role": "user", "content": text},
                     ],
-                    max_tokens=2000,
+                    max_tokens=10000,
                 )
                 if verbose:
                     print(completion.choices)
@@ -93,10 +93,12 @@ class LLMModel(metaclass=SingletonClass):
                         ],
                     # response_format={ "type": "json_object" }
                 )
+                
                 return response.choices[0].message.content
             
         except Exception as e:
             print("Exception: Error in calling LLM", e)
+            raise e
             return None
 
         

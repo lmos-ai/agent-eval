@@ -177,7 +177,7 @@
           multiple
           size="5"
         >
-          <!-- Options loaded dynamically from /api/conversations -->
+          <!-- Options loaded dynamically from /ui/conversations -->
         </select>
         <!-- We'll place "Show Logs" buttons here for each selected conversation -->
         <div id="conversation-buttons" style="margin-top:1rem;"></div>
@@ -243,7 +243,7 @@
   /************************************************
    * fetch NER entities
    ************************************************/
-  fetch("/api/entities")
+  fetch("/ui/entities")
       .then(response => response.json())
       .then(data => {
         const selectElement = document.getElementById("entitySelect");
@@ -412,7 +412,7 @@
   }
 
   function fetchConversationLogs(cid, $card) {
-    $.get(`/api/conversations/${cid}`, function(data) {
+    $.get(`/ui/conversations/${cid}`, function(data) {
       if (!data.logs) {
         alert("No logs found for " + cid);
         return;
@@ -464,7 +464,7 @@
 
   function fetchSimulationSteps(simId) {
     if (!simId) return;
-    $.get(`/api/simulations/${simId}`, function(data) {
+    $.get(`/ui/simulations/${simId}`, function(data) {
       if (!data.steps) {
         alert("No steps found for simulation " + simId);
         return;
@@ -498,7 +498,7 @@
    ************************************************/
   $(document).ready(function() {
     // 1) Load conversation IDs
-    $.get("/api/conversations", function(data) {
+    $.get("/ui/conversations", function(data) {
       const $conv = $("#conversation");
       data.forEach(item => {
         $conv.append(`<option value="${item.id}">${item.name}</option>`);
@@ -508,7 +508,7 @@
     });
 
     // 2) Load simulation IDs
-    $.get("/api/simulations", function(data) {
+    $.get("/ui/simulations", function(data) {
       const $sim = $("#simulation");
       data.forEach(item => {
         $sim.append(`<option value="${item.id}">${item.name}</option>`);
@@ -561,7 +561,7 @@
       const formData = $(this).serialize();
       console.log("Form data:", formData);
 
-      $.post("/evaluate", formData, function(data) {
+      $.post("/ui/evaluate", formData, function(data) {
         $("#loader").hide();
         $("#results").show();
 

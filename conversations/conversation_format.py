@@ -41,7 +41,6 @@ class InputConversationsFormator(ConversationGenerator):
 
             # Traverse events in reverse order
             for event in reversed(events):
-                print(conversation_entries)
                 event_type = event.get("type")
                 payload = json.loads(event.get("payload"))
                 print(f"Got Event Type:{event_type}")

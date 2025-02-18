@@ -1,50 +1,51 @@
 from llm.llm import LLMModel
-from evaluators.steps_evaluator import run_llm_evaluator_pipeline_with_validations
+from evaluators import run_evaluation_pipeline
 from global_variable import NER_ENTITIES
+from config import Config
+from typing import List
+from models.gliner_model import GliNerMODEL
+from helper_functions.algorithms import EXPECTED_RESPONSE_CHECK, FUNCTION_CALLINGS_CHECK, NER_HALUCINATION, STEPS_IN_ORDER
+
+config = Config()
+
+valid_algorithms = [EXPECTED_RESPONSE_CHECK, FUNCTION_CALLINGS_CHECK, NER_HALUCINATION, STEPS_IN_ORDER]
 
 
 
-
-
-def evaluation_pipeline( conversation_log:list, use_case_evaluation:list, llm:LLMModel, check_protocols:bool=True):
+def evaluation_pipeline(conversation_log:dict, 
+                        llm:LLMModel, simulation_steps:dict, 
+                        algorithms:List=[], ner_model=None,ner_threshold:float=0.7):
     """
     Parameters:
-    - agent_usecases (dict): Contains use case information like description, steps, expected response, and examples.
     - conversation_log (dict): The conversation between the agent and the user.
-    - use_case_evaluation (dict): Contains details of the top use case, sub-use case, steps to follow, and example conversations to evaluate.
-    - llm (Any): LLM instance
+    - llm (LLMModel): LLM instance
+    - simulation_steps (dict): simulation_steps for evaluating with.
 
-    Returns:
-    - dict: The formatted dict having evaluation.
+    
     """
-    if not conversation_log or not use_case_evaluation:
+    if not conversation_log:
         raise ValueError("Invalid input parameters")
-    if llm is None:
+    elif not algorithms:
+        raise Exception("Algoritms to perform is empty. Please pass valid algorithms")
+    elif not [1 for algo in algorithms if algo.upper() in valid_algorithms]:
+        raise Exception(f"Algorithm passed in algorithms list is invalid. Please choose from : {valid_algorithms}")
+    elif llm is None:
         raise ValueError("LLM passed is None. Please check.")
-    
-    json_response = {}
-    scores = {}
-    steps_in_order = {}
-    if check_protocols:
-        for simulation in use_case_evaluation:
-            for conversation in conversation_log:
-                df, are_steps_in_order, final_score = run_llm_evaluator_pipeline_with_validations(
-                                                        conversation_logs=conversation,
-                                                        simulation_steps=simulation,
-                                                        llm=llm,
-                                                        halucination_threshold=0.7,
-                                                        ner_entities=NER_ENTITIES
-                                                    )
-                df.to_csv("./evaluation_reports/"+conversation+".csv")
-                scores[conversation] = final_score
-                steps_in_order[conversation] = are_steps_in_order
-    
-    print("--------------------------------")
-    print("---------Evaluation Report------\n")
-    for conversation in conversation_log:
-        print(f"Conv: {conversation} || Score: {scores[conversation]} || Steps in Order: {steps_in_order[conversation]}")
-    print("\n---------------------------------")
-
-        
-    
-    return steps_in_order, scores, sum(scores.keys())/len(scores)
+    elif not simulation_steps:
+        raise ValueError("Pass simulation_gerenerator class instance.")
+    elif not isinstance(simulation_steps, dict):
+        raise Exception("Make sure the simulation_generator is of dict type")
+    try:
+        df, are_steps_in_order, final_score = run_evaluation_pipeline(
+                                                algorithms=algorithms,
+                                                ner_threshold=ner_threshold,
+                                                conversation_logs=conversation_log,
+                                                simulation_steps=simulation_steps,
+                                                llm=llm,
+                                                ner_entities=NER_ENTITIES,
+                                                ner_model=ner_model
+                                            )
+        return [df, are_steps_in_order, final_score]
+    except Exception as e:
+        print(f"Got exception while evaluating: {e}")
+        return None

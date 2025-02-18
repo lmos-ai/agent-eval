@@ -1,3 +1,12 @@
+import uuid
+
+def generate_uuid() -> str:
+    """
+    Generates a UUID (version 4) and returns it as a string.
+    """
+    return str(uuid.uuid4())
+
+
 class FunctionExtractor:
     """
     Extracts actual functions called in a conversation log.

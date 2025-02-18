@@ -157,6 +157,7 @@ class LLMEvaluatorPipeline:
                 # adding result
                 self.results.append({
                     "query": query,
+
                     "llm_halucinated": llm_result["is_halucinated"],
                     "ner_halucination_safe_index": (1-ner_halucination_score)*100,
                     "ner_keyword_extracted":keyword_extracted,
@@ -166,7 +167,6 @@ class LLMEvaluatorPipeline:
                     "is_in_correct_step_followed": is_correct_step_followed,
                     "step_name": matched_step["step_name"] if matched_step else None,
 
-                    "follow_up_question": llm_result['follow_up_question'],
                     "expected_functions": expected_functions_names,
                     "actual_functions": str(actual_functions),
 
