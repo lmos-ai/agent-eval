@@ -10,5 +10,3 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 echo "BUILD END"
-
-flask run --reload --port 5005
