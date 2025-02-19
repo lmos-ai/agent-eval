@@ -9,4 +9,8 @@ source venv/bin/activate
 # build_files.sh
 pip install -r requirements.txt
 
+# create an output directory for Vercel if needed
+mkdir -p staticfiles_build
+
+
 echo "BUILD END"
