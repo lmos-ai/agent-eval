@@ -11,4 +11,4 @@ pip install -r requirements.txt
 
 echo "BUILD END"
 
-flask run --reload
+flask run --reload --port 5001
