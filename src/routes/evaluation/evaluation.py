@@ -130,7 +130,7 @@ def evaluate():
                 llm=llm,
                 simulation_steps=simulation_steps,
                 conversation_log=conversation_logs,
-                ner_model = GliNerMODEL(config.GLINER_MODEL).model,
+                ner_model = 1, #TODO uncomment it for NER #GliNerMODEL(config.GLINER_MODEL).model,
                 algorithms=[EXPECTED_RESPONSE_CHECK]
             )
             if not response:

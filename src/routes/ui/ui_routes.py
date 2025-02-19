@@ -126,7 +126,7 @@ def evaluate():
                 simulation_steps=steps,
                 conversation_logs=conversation,
                 llm=llm,
-                gliner_model=GliNerMODEL(config.GLINER_MODEL).model,
+                gliner_model= 1, #TODO uncomment for NER GliNerMODEL(config.GLINER_MODEL).model,
                 halucination_threshold=float(halucination_threshold),
                 ner_entities = selected_entities
             )
