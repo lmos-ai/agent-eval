@@ -137,6 +137,29 @@ The application will automatically load these values when it runs.
    ```sh
    flask run --reload 
    ```
+3. Access the Application and Swagger UI:<br>
+    Flask Application: http://127.0.0.1:5000<br>
+    Swagger UI: http://127.0.0.1:5000/apidocs/
+
+# Running With Docker
+## Building the Docker Image
+From the project directory (where the Dockerfile is located), run:
+
+```sh
+docker build -t agent-eval .
+```
+## Running the Docker Container
+Start the container with:
+
+```sh
+docker run --env-file .env -p 5000:5000 agent-eval
+```
+
+- The --env-file .env flag loads environment variables from your .env file.
+- The -p 5000:5000 flag maps port 5000 in the container to port 5000 on your host machine.
+## Accessing the Application and Swagger UI
+Flask Application: http://localhost:5000 <br>
+Swagger UI: http://localhost:5000/apidocs/
 
 ## Using the API
 
