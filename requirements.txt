@@ -12,3 +12,5 @@ gliner
 flasgger
 marshmallow
 pymongo
+flask-swagger-ui
+flask-cors
