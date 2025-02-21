@@ -1,13 +1,15 @@
 # app.py
 from flask import Blueprint, request, jsonify
+import uuid
 from dataclasses import asdict
 from llm.llm import LLMModel
 from conversations.pipeline import ConversationService
-from data_model.evaluation import EvaluationRequestSchema
+from data_model.evaluation import EvaluationRequestSchema, BackgroundTaskStatusRequestSchema
 from marshmallow import ValidationError
 from simulation.pipeline import SimulationProcessor
 from simulation.test_case_parser import TestCaseParser
 from typing import List, Dict
+from threading import Thread
 from data_model.simulations import GroundTruthConversation
 from evaluator import evaluation_pipeline
 from helper_functions.algorithms import EXPECTED_RESPONSE_CHECK
@@ -20,6 +22,8 @@ import pandas as pd
 from helper_functions.response import ApiResponse
 from conversations.conversation_generator import AutomaticConversationGenerator
 from conversations.conversation_format import InputConversationsFormator
+from background_tasks.evaluation import llm_black_box_evaluation_task
+from global_variable import BACKGROUND_TASK_COLLECTION, RUNNING_STATUS, TASK_COMPLETED_STATUS, TASK_FAILED_STATUS, TASK_STARTED
 
 
 config = Config()
@@ -69,62 +73,7 @@ class JSONTestCaseParser(TestCaseParser):
 ##############################################################################################
 # ------------------ BELOW APIS ARE FOR EVALUATION AND MAIN FUNCTIONALTY ---------------------
 ###############################################################################################
-# -------------------- API FOR DATA FORMATTING --------------------
-@evaluation_bp.route("/format-data", methods=['POST'])
-def format_input_conversation():
-    """
-    Format conversation data for preprocessing.
 
-    Expected Input (JSON):
-    {
-        "conversation_thread_id": "abc123",
-        "input_data": { ... }
-    }
-
-    Responses:
-    - 200: Successful response with formatted conversation data.
-    - 400: Missing required parameters.
-    - 500: Internal server error.
-    """
-    data = request.get_json()
-
-    if not data:
-        return ApiResponse.bad_request("Request body cannot be empty.")
-
-    conversation_thread_id = data.get("conversation_thread_id")
-    input_data = data.get("input_data")
-
-    if not conversation_thread_id:
-        return ApiResponse.bad_request("Missing 'conversation_thread_id' parameter.")
-    if not input_data:
-        return ApiResponse.bad_request("Missing 'input_data' parameter.")
-
-    try:
-        #################################################################
-        # Below Are the interfaces classes for formatting the conversation
-
-        # 1, Input Formatter: When you have your own conversation, then you have to overwrite the below InputConversationsFormator class
-        #    And change the logic to return same type of format that evaluator expects.
-        input_conversation_formatter = InputConversationsFormator()
-
-        # 2, Automatic Conversation Generator: This is under progress. When you want to contact with your agent in realtime and generate the
-        #    conversation such that it satisfy the evalyator input format, then overwrite the AutomaticConversationGenerator class
-        automatic_conversation_formatter = AutomaticConversationGenerator()
-
-
-
-        service = ConversationService(
-            conversation_formator=input_conversation_formatter,
-            automatic_conversation_generator=automatic_conversation_formatter
-            )
-        response = service.get_conversation(input_json=input_data)
-        print("[SUCCESS] Got the formatted conversation")
-        return ApiResponse.success(data=asdict(response), message="Conversation formatted successfully.")
-
-    except Exception as e:
-        print(f"[!] Exception for conversation_id {conversation_thread_id}: {str(e)}")
-        return ApiResponse.internal_server_error(message=str(e))
-    
 @evaluation_bp.route("/evaluate-llm", methods=['POST'])
 def evaluate():
     """Endpoint for LLM evaluation."""
@@ -158,94 +107,29 @@ def evaluate():
         return ApiResponse.bad_request("conversation_logs cannot be None or empty")
     if not data['test_cases']:
         return ApiResponse.bad_request("test_cases cannot be None or empty")
-
     try:
-        #---------------------------------------------------------------------------
-        # Create Specifications/Simulations from the Test Cases
-        #---------------------------------------------------------------------------
-        simulation_processor = SimulationProcessor(
-            llm=llm,
-            test_cases=data['test_cases'],
-            use_case=data.get("use_case"),
-            json_testclass_parser=JSONTestCaseParser   # For your own JSON parser for simulation. Please owerrite the JSONTestCaseParser class
-        )
-        simulation_steps = simulation_processor.run()
-
-        # Format Conversation Logs
-        conversations: List[List[Dict]] = data['conversation_logs']
-        if not isinstance(conversations[0], dict):
-            return ApiResponse.bad_request("conversation_logs must be a list of JSON objects. Each object should represent a conversation.")
-
-        results = []
-        final_score_avg = []
-        print("[.] Started Evaluation")
-        for i, conversation in enumerate(conversations):
-            print("[.] Formatting the conversation")
-            conversation_service = ConversationService(
-                automatic_conversation_generator=automatic_conversation_formatter,
-                conversation_formator=input_conversation_formatter
-            )
-            conversation_logs = conversation_service.get_conversation(conversation).conversation_entries
-            print("[.] Evaluating the formatted conversation")
-            # Evaluate the AI agent and pass the simulation and conversation
-            response = evaluation_pipeline(
-                llm=llm,
-                simulation_steps=simulation_steps,
-                conversation_log=conversation_logs,
-                ner_model=GliNerMODEL(config.GLINER_MODEL).model,
-                algorithms=[EXPECTED_RESPONSE_CHECK]
-            )
-
-            if not response:
-                results.append(None)
-            else:
-                df, are_steps_in_order, final_score = response
-                df: pd.DataFrame = df
-                unique_id = generate_uuid()
-                df.to_csv(f"evaluation_reports/{data['use_case']}_{unique_id}.csv")
-                df_json = df.to_json()
-
-                results.append({
-                    "id": unique_id,
-                    "report": df_json,
-                    "score": final_score,
-                    "are_steps_in_order": are_steps_in_order
-                })
-                final_score_avg.append(final_score)
-        print("[.] Saving Evaluation results in MongoDB")
-        # Initialize MongoDB service
-        mongo_service = MongoDBService(db_name=config.MONGO_DATABASE, uri=config.MONGO_URI)
-
-        # Save evaluation data
-        mongo_response = mongo_service.save_evaluation_data(final_score_avg, results)
-
-        # Return the result
-        print("[SUCCESS] Success in evaluation")
-        return ApiResponse.success(data={"id": mongo_response}, message="Evaluation completed successfully.")
-
+        # start evaluation in background
+        # Generate a unique task ID
+        task_id = str(uuid.uuid4())
+        # Start the evaluation in a background thread
+        thread = Thread(target=llm_black_box_evaluation_task, args=(llm, task_id, data, JSONTestCaseParser, automatic_conversation_formatter, 
+                                                                    input_conversation_formatter))
+        thread.daemon = True
+        thread.start()
+        mongo_service = MongoDBService(db_name=config.MONGO_DATABASE, uri=config.MONGO_URI, collection=BACKGROUND_TASK_COLLECTION)
+        mongo_service.save_document(document={
+            "task_id": task_id,
+            "task_status": "running",
+            "evaluation_result_id": None
+        })
+        return ApiResponse.success(data={"task_id":task_id, "task_status":TASK_STARTED})
     except Exception as e:
-        print(f"[!] Unexpected Error: {str(e)}")
+        print(f"[!] Got error in staring evaluation thread. Error is: {str(e)}")
         return ApiResponse.internal_server_error()
 
 
-@evaluation_bp.route("/get-result", methods=['GET'])
+@evaluation_bp.route("/get-evaluation-result", methods=['GET'])
 def get_evaluation_result():
-    """
-    Fetch evaluation results by ID.
-    
-    Example Request:
-    GET /api/evaluation/get-result?id=your_unique_id
-
-    Response:
-    {
-        "status": "success",
-        "message": "Evaluation data retrieved successfully",
-        "data": {
-            "final_score": 0.85,
-            "results": [...]
-        }
-    }
-    """
     eval_id = request.args.get("id")  # Fetch ID from query params
 
     if not eval_id:
@@ -253,7 +137,7 @@ def get_evaluation_result():
 
     try:
         # Initialize MongoDB service
-        mongo_service = MongoDBService(db_name=config.MONGO_DATABASE, uri=config.MONGO_URI)
+        mongo_service = MongoDBService(db_name=config.MONGO_DATABASE, uri=config.MONGO_URI, collection=config.EVALUATION_COLLECTION)
 
         data = mongo_service.get_evaluation_data(eval_id)
 
@@ -265,3 +149,41 @@ def get_evaluation_result():
     except Exception as e:
         print(f"[!] Unexpected Error: {str(e)}")
         return ApiResponse.internal_server_error(message="Internal Server Error")
+
+@evaluation_bp.route("/task-status/<task_id>", methods=["GET"])
+def get_backgroundtask_status(task_id: str):
+    # Validate the task_id using the schema
+    schema = BackgroundTaskStatusRequestSchema()
+    try:
+        # Since task_id is provided as a path parameter, we create a dict for validation
+        validated_data = schema.load({"task_id": task_id})
+    except ValidationError as err:
+        return ApiResponse.bad_request(message="Please pass task_id returned from the evaluation API.")
+
+    try:
+        # Initialize MongoDBService for the background tasks collection
+        mongo_service = MongoDBService(
+            db_name=config.MONGO_DATABASE,
+            uri=config.MONGO_URI,
+            collection=BACKGROUND_TASK_COLLECTION
+        )
+        
+        # Retrieve the task document based on the task_id
+        task_document = mongo_service.get_document({"task_id": validated_data["task_id"]})
+        if not task_document:
+            return ApiResponse.not_found(f"No such task running for task_id: {validated_data['task_id']}")
+
+        response = {
+            "task_id": task_document.get("task_id"),
+            "task_status": task_document.get("task_status")
+        }
+        
+        # If the task is completed, include the evaluation_result_id
+        if task_document.get("task_status") == TASK_COMPLETED_STATUS:
+            if "evaluation_result_id" in task_document:
+                response["evaluation_result_id"] = task_document.get("evaluation_result_id")
+        
+        return ApiResponse.success(data=response)
+    except Exception as e:
+        print(f"[!] Got Exception while checking status of background task with Task_id: {validated_data['task_id']}")
+        return ApiResponse.internal_server_error()

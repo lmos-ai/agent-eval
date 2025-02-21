@@ -16,3 +16,10 @@ class EvaluationRequestSchema(Schema):
         required=True,
         description="Use cases or Agent name for test case passed which is going to be evaluated."
     )
+
+
+class BackgroundTaskStatusRequestSchema(Schema):
+    task_id = fields.String(
+        required=True,
+        description="Unique ID of the background task to check its status."
+    )

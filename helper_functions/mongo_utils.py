@@ -3,13 +3,47 @@ import json
 from uuid import uuid4
 
 class MongoDBService:
-    def __init__(self, db_name:str, uri:str="mongodb://localhost:27017/"):
+    def __init__(self, db_name:str, collection:str, uri:str="mongodb://localhost:27017/"):
         """
         Initialize MongoDB connection.
         """
         self.client = MongoClient(uri)
         self.db = self.client[db_name]
-        self.collection = self.db["evaluation_results"]
+        self.collection = self.db[collection]
+
+    def save_document(self, document: dict):
+        """
+        Save a document to MongoDB.
+
+        :param document: A dictionary representing the document to save.
+        :return: The unique ID of the inserted document as a string.
+        """
+        result = self.collection.insert_one(document)
+        return str(result.inserted_id)
+    
+    def update_document(self, id: str, data: dict):
+        """
+        Update an existing document in MongoDB.
+
+        :param id: The unique ID of the document to update.
+        :param data: A dictionary containing the fields to update.
+        :return: The number of documents modified.
+        """
+        result = self.collection.update_one({"task_id": id}, {"$set": data})
+        return result.modified_count
+    
+    def get_document(self, filter: dict):
+        """
+        Fetch a document from MongoDB based on a filter.
+
+        :param filter: Dictionary representing the filter criteria.
+        :return: Document if found, None otherwise.
+        """
+        result = self.collection.find_one(filter)
+        if result:
+            result.pop('_id', None)  # Remove _id for cleaner output
+        return result
+    
 
     def get_evaluation_data(self, eval_id: str):
         """
