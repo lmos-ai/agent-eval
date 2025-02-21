@@ -18,10 +18,13 @@ class Config(metaclass=SingletonClass):
         self.GLINER_MODEL = os.environ.get("GLINER_MODEL")
         self.MONGO_URI = os.environ.get("MONGO_URI")
         self.MONGO_DATABASE = os.environ.get("MONGO_DATABASE")
-        model_source = os.environ.get("MODEL_SOURCE")
-        if model_source.upper() == AZURE_LLM:
+        self.model_source = os.environ.get("MODEL_SOURCE")
+        self.EVALUATION_COLLECTION = os.environ.get("EVALUATION_COLLECTION")
+        self.PREPROCESSED_DATA_COLLECTION = os.environ.get("PREPROCESSED_DATA_COLLECTION")
+
+        if self.model_source.upper() == AZURE_LLM:
             self.MODEL_SOURCE = AZURE_LLM
-        elif model_source.upper() == OPENAI_LLM:
+        elif self.model_source.upper() == OPENAI_LLM:
             self.MODEL_SOURCE = OPENAI_LLM
         else:
             raise Exception(f"For Model source please choose between {[AZURE_LLM, OPENAI_LLM]}")

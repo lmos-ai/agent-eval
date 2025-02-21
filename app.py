@@ -15,7 +15,10 @@ swagger_template = {
     "swagger": "2.0",
     "info": {
         "title": "LLM Evaluation API",
-        "description": "API for LLM evaluation and conversation data formatting",
+        "description": (
+            "API for asynchronous LLM evaluation, conversation formatting, "
+            "evaluation result retrieval, and background task status monitoring."
+        ),
         "version": "1.0.0"
     },
     "basePath": "/evaluation",
@@ -24,47 +27,13 @@ swagger_template = {
         "https"
     ],
     "paths": {
-        "/format-data": {
-            "post": {
-                "summary": "Format conversation data for preprocessing",
-                "description": "This API formats conversation data before it is sent for further processing or evaluation.",
-                "parameters": [
-                    {
-                        "name": "body",
-                        "in": "body",
-                        "description": "Input data for formatting",
-                        "required": True,
-                        "schema": {
-                            "type": "object",
-                            "properties": {
-                                "conversation_thread_id": {"type": "string"},
-                                "input_data": {"type": "object"}
-                            },
-                            "required": ["conversation_thread_id", "input_data"]
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Successful response with formatted conversation data.",
-                        "schema": {
-                            "type": "object",
-                            "properties": {
-                                "status": {"type": "string"},
-                                "message": {"type": "string"},
-                                "data": {"type": "object"}
-                            }
-                        }
-                    },
-                    "400": {"description": "Missing required parameters."},
-                    "500": {"description": "Internal server error."}
-                }
-            }
-        },
         "/evaluate-llm": {
             "post": {
-                "summary": "Evaluate LLM performance",
-                "description": "This endpoint evaluates an LLM by running simulations based on the input test cases and conversation logs.",
+                "summary": "Evaluate LLM performance asynchronously",
+                "description": (
+                    "Initiates an asynchronous evaluation of an LLM using the provided "
+                    "test cases and conversation logs. Returns a task ID to track the evaluation status."
+                ),
                 "parameters": [
                     {
                         "name": "body",
@@ -74,29 +43,43 @@ swagger_template = {
                         "schema": {
                             "type": "object",
                             "properties": {
-                                "use_case": {"type": "string"},
+                                "unique_id": {
+                                    "type": "string",
+                                    "description": "Unique ID for tracking the evaluation."
+                                },
+                                "use_case": {
+                                    "type": "string",
+                                    "description": "Use case or agent name for evaluation."
+                                },
                                 "conversation_logs": {
                                     "type": "array",
-                                    "items": {"type": "object"}
+                                    "items": {"type": "object"},
+                                    "description": "List of conversation logs between user and assistant."
                                 },
                                 "test_cases": {
                                     "type": "array",
-                                    "items": {"type": "object"}
+                                    "items": {"type": "object"},
+                                    "description": "List of test cases for evaluating the LLM."
                                 }
                             },
-                            "required": ["use_case", "conversation_logs", "test_cases"]
+                            "required": ["unique_id", "use_case", "conversation_logs", "test_cases"]
                         }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Evaluation results successfully retrieved.",
+                        "description": "Task started successfully and returns task ID.",
                         "schema": {
                             "type": "object",
                             "properties": {
                                 "status": {"type": "string"},
-                                "message": {"type": "string"},
-                                "data": {"type": "object"}
+                                "data": {
+                                    "type": "object",
+                                    "properties": {
+                                        "task_id": {"type": "string"},
+                                        "status": {"type": "string"}
+                                    }
+                                }
                             }
                         }
                     },
@@ -105,15 +88,18 @@ swagger_template = {
                 }
             }
         },
-        "/get-result": {
+        "/get-evaluation-result": {
             "get": {
                 "summary": "Fetch evaluation results by ID",
-                "description": "This endpoint retrieves evaluation results based on the provided evaluation ID.",
+                "description": (
+                    "Retrieves evaluation results based on the provided evaluation result ID. "
+                    "The result includes final score and detailed evaluation metrics."
+                ),
                 "parameters": [
                     {
                         "name": "id",
                         "in": "query",
-                        "description": "The unique evaluation ID",
+                        "description": "The unique evaluation result ID",
                         "required": True,
                         "type": "string"
                     }
@@ -130,13 +116,54 @@ swagger_template = {
                             }
                         }
                     },
-                    "400": {"description": "Missing 'id' parameter."},
+                    "400": {"description": "Missing or invalid 'id' parameter."},
+                    "500": {"description": "Internal server error."}
+                }
+            }
+        },
+        "/task-status/{task_id}": {
+            "get": {
+                "summary": "Get background task status",
+                "description": (
+                    "Retrieves the status of a background evaluation task. If completed, returns the "
+                    "evaluation result ID; otherwise, only the current status is returned."
+                ),
+                "parameters": [
+                    {
+                        "name": "task_id",
+                        "in": "path",
+                        "description": "Unique ID of the background task",
+                        "required": True,
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Task status retrieved successfully.",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "status": {"type": "string"},
+                                "data": {
+                                    "type": "object",
+                                    "properties": {
+                                        "task_id": {"type": "string"},
+                                        "status": {"type": "string"},
+                                        "evaluation_result_id": {"type": "string"}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {"description": "Invalid or missing task_id parameter."},
+                    "404": {"description": "Task not found."},
                     "500": {"description": "Internal server error."}
                 }
             }
         }
     }
 }
+
 
 # Initialize Swagger with the above template
 swagger = Swagger(app, template=swagger_template)
