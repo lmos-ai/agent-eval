@@ -4,18 +4,18 @@
 
 Black Box Evaluation is a system that evaluates any AI agent's performance while ensuring it follows all specified rules. It checks for hallucinations using a hybrid approach of Named Entity Recognition (NER) and Python. Additionally, it verifies whether the AI agent's response is correct and provides reasoning for correctness or incorrectness.
 
-This project now supports **asynchronous evaluations** using background tasks. When you submit an evaluation request, the system immediately returns a task ID, and the actual evaluation runs in a separate thread. You can query the status of this task at any time and retrieve the final results once the evaluation completes.
+This project supports **asynchronous evaluations** using background tasks. When you submit an evaluation request, the system immediately returns a task ID, and the actual evaluation runs in a separate thread. You can query the status of this task at any time and retrieve the final results once the evaluation completes.
 
 ---
 
 ## Features
 
-- Evaluates AI agent performance in an **asynchronous** manner
-- Detects hallucinations using NER and Python
-- Checks response correctness
-- Provides reasoning for correct or incorrect responses
-- Supports multiple evaluation techniques
-- Includes a **background task** system with status polling
+- Evaluates AI agent performance in an **asynchronous** manner.  
+- Detects hallucinations using NER and Python.  
+- Checks response correctness.  
+- Provides reasoning for correct or incorrect responses.  
+- Supports multiple evaluation techniques.  
+- Includes a **background task** system with status polling.  
 
 ---
 
@@ -100,219 +100,225 @@ class TestCaseParser(ABC):
 
 ## Installation & Setup
 
-1. **Clone the repository:**
-   ```sh
-   git clone https://github.com/lmos-ai/agent-eval.git
-   ```
-2. **Navigate to the project directory:**
-   ```sh
-   cd agent-eval
-   ```
-3. **Create and activate a virtual environment:**
-   ```sh
-   python -m venv venv
-   source venv/bin/activate  # On macOS/Linux
-   venv\Scripts\activate     # On Windows
-   ```
-4. **Install dependencies:**
-   ```sh
-   pip install -r requirements.txt
-   ```
+Below are instructions to install, configure, and run the application using both a **Python virtual environment** and **Docker**.
 
----
+### 1. Clone the Repository
 
-### Configuring Environment Variables
+```sh
+git clone https://github.com/lmos-ai/agent-eval.git
+cd agent-eval
+```
 
-Instead of setting environment variables manually, create a `.env` file in the root directory with the following content:
+### 2. Create and Activate a Virtual Environment
+
+On macOS/Linux:
+```sh
+python -m venv venv
+source venv/bin/activate
+```
+
+On Windows:
+```sh
+python -m venv venv
+venv\Scripts\activate
+```
+
+### 3. Install Dependencies
+
+```sh
+pip install -r requirements.txt
+```
+
+### 4. Configure Environment Variables
+
+Instead of setting environment variables manually, create a `.env` file in the root directory:
 
 ```ini
-LLM_ENDPOINT=https://api.openai.com/v1   # [OpenAI] or use your own LLM Endpoint
+LLM_ENDPOINT=https://api.openai.com/v1
 API_KEY=<your-api-key>
-MODEL_NAME=gpt-3.5-turbo                # [Or any LLM Model]
+MODEL_NAME=gpt-3.5-turbo
 FLASK_RUN_HOST=127.0.0.1
 FLASK_RUN_PORT=5000
 GLINER_MODEL=urchade/gliner_large-v2.1
 MONGO_URI=<your-mongo-uri>
 MONGO_DATABASE=<your-mongo-database>
 MODEL_SOURCE=<your-model-source>
-# MONGODB COLLECTIONS
+# MongoDB Collections
 EVALUATION_COLLECTION=<your-mongodb-collection-name>
 PREPROCESSED_DATA_COLLECTION=<your-mongodb-collection-name>
 ```
 
 The application automatically loads these values at runtime.
 
-For more GliNER models, you can visit [GliNER Models on Hugging Face](https://huggingface.co/models?library=gliner&sort=trending).
-
 ---
 
 ## Running the Flask Application
 
-You can run the application either directly on your machine or using Docker.
+### Option A: Running With a Virtual Environment
 
-### Running Without Docker
-
-1. **Ensure the virtual environment is activated:**
+1. **Make sure your virtual environment is activated**:
    ```sh
-   source venv/bin/activate  # On macOS/Linux
-   venv\Scripts\activate     # On Windows
+   source venv/bin/activate   # macOS/Linux
+   venv\Scripts\activate      # Windows
    ```
-2. **Start the Flask server:**
+
+2. **Start the Flask Server**:
    ```sh
    flask run --reload
    ```
-3. **Access the Application and Swagger UI:**
-   - Flask Application: [http://127.0.0.1:5000](http://127.0.0.1:5000)  
-   - Swagger UI: [http://127.0.0.1:5000/apidocs/](http://127.0.0.1:5000/apidocs/)
+   - The app (and its Swagger UI) will be accessible at:
+     - [http://127.0.0.1:5000](http://127.0.0.1:5000)
+     - [http://127.0.0.1:5000/apidocs/](http://127.0.0.1:5000/apidocs/)
+
+### Option B: Running With Docker
+
+1. **Build the Docker Image** (from the same directory as the `Dockerfile`):
+   ```sh
+   docker build -t agent-eval .
+   ```
+
+2. **Run the Docker Container**:
+   ```sh
+   docker run --env-file .env -p 5000:5000 agent-eval
+   ```
+   - `--env-file .env` loads environment variables from your `.env` file.
+   - `-p 5000:5000` publishes port 5000 in the container to port 5000 on your host.
+
+3. **Access the Application**:
+   - [http://localhost:5000](http://localhost:5000)
+   - [http://localhost:5000/apidocs/](http://localhost:5000/apidocs/)
 
 ---
 
-### Running With Docker
+## Using the APIs
 
-#### 1. Building the Docker Image
-From the project directory (where the `Dockerfile` is located), run:
-```sh
-docker build -t agent-eval .
-```
+Below are the core endpoints for performing an asynchronous LLM evaluation. The typical flow is:
 
-#### 2. Running the Docker Container
-Start the container with:
-```sh
-docker run --env-file .env -p 5000:5000 agent-eval
-```
-- `--env-file .env`: Loads environment variables from your `.env` file.
-- `-p 5000:5000`: Maps port `5000` in the container to port `5000` on your host machine.
+1. **POST** to `/evaluate-llm` to initiate the evaluation.
+2. Receive a `task_id` that you can use to check the status via `/task-status/<task_id>`.
+3. Once the status is `TASK_COMPLETED`, use the returned `evaluation_result_id` to call `/get-evaluation-result`.
 
-#### 3. Access the Application and Swagger UI
-- Flask Application: [http://localhost:5000](http://localhost:5000)  
-- Swagger UI: [http://localhost:5000/apidocs/](http://localhost:5000/apidocs/)
+### 1. Initiate Evaluation
 
----
-
-## Using the API
-
-### 1. **Evaluate AI Agent (Asynchronous)**
-- **Endpoint:** `POST /evaluate-llm`
-- **Description:** Initiates an asynchronous LLM evaluation. Returns a `task_id` immediately while the evaluation runs in the background.
-- **Request Body Example:**
-  ```json
-  {
-      "use_case": "Billing Agent",
-      "unique_id": "hello1234",
-      "conversation_logs": [
-          // LIST OF CONVERSATION
-      ],
-      "test_cases": [
-          // LIST OF TEST CASES
+**Endpoint:** `POST /evaluate-llm`  
+**Description:** Starts an asynchronous evaluation of your LLM conversation and returns a unique `task_id`.  
+**Request Body Example:**
+```json
+{
+  "use_case": "Billing Agent",
+  "unique_id": "hello1234",
+  "conversation_logs": [
+    {
+      "user": "Hello, I'd like more info about my bill.",
+      "assistant": "Sure, can you please provide your account number?"
+    }
+  ],
+  "test_cases": [
+    {
+      "testCases": [
+        {
+          "expected": {
+            "messages": [
+              { "type": "user", "content": "Hello, I'd like more info about my bill." },
+              { "type": "bot", "content": "Sure, can you please provide your account number?" }
+            ]
+          }
+        }
       ]
+    }
+  ]
+}
+```
+
+**Successful Response Example:**
+```json
+{
+  "message": "success",
+  "status": "success",
+  "data": {
+    "task_id": "d2f364c6-cffe-4ff7-9fd9-ce2d9b24ed79",
+    "task_status": "TASK_STARTED"
   }
-  ```
-- **Response Example:**
+}
+```
+- You should **save** this `task_id` to check the status of the background process.
+
+---
+
+### 2. Check Evaluation Task Status
+
+**Endpoint:** `GET /task-status/<task_id>`  
+**Description:** Returns whether the task is still running, completed, or failed. If completed, the response also contains the `evaluation_result_id` needed to fetch final results.
+
+**Possible Response Examples:**
+
+- **Running**:
   ```json
   {
-      "message":"success",
       "status": "success",
+      "message": "success",
       "data": {
           "task_id": "d2f364c6-cffe-4ff7-9fd9-ce2d9b24ed79",
-          "status": "TASK_STARTED"
+          "task_status": "running"
       }
   }
   ```
 
-You can then use this `task_id` to check the background evaluation’s status.
-
----
-
-### 2. **Get Evaluation Result**
-- **Endpoint:** `GET /get-evaluation-result`
-- **Description:** Retrieves the final evaluation results by using an `id` (the unique evaluation result ID).
-- **Query Parameter:** `id` (required)
-- **Request Example:**
-  ```
-  GET /get-evaluation-result?id=<your_evaluation_result_id>
-  ```
-- **Response Example:**
+- **Completed**:
   ```json
   {
       "status": "success",
-      "message": "Evaluation data retrieved successfully",
+      "message": "success",
       "data": {
-          "final_score": 0.85,
-          "results": [
-              // ...
-          ]
+          "task_id": "d2f364c6-cffe-4ff7-9fd9-ce2d9b24ed79",
+          "task_status": "completed",
+          "evaluation_result_id": "e12345f7-8g9h-10i1-jklm-..."
       }
+  }
+  ```
+
+- **Not Found or Failed**:
+  ```json
+  {
+      "status": "error",
+      "message": "No such task running for task_id: d2f364c6-cffe-4ff7-9fd9-ce2d9b24ed79"
   }
   ```
 
 ---
 
-### 3. **Check Background Task Status**
-- **Endpoint:** `GET /task-status/<task_id>`
-- **Description:** Checks the status of a background evaluation task. If the task is completed, returns the `evaluation_result_id`.
-- **Path Parameter:** `<task_id>` (required)
-- **Request Example:**
-  ```
-  GET /task-status/d2f364c6-cffe-4ff7-9fd9-ce2d9b24ed79
-  ```
-- **Response Examples:**
-  - **In Progress:**
-    ```json
-    {
-        "status": "success",
-        "message":"success",
-        "data": {
-            "task_id": "d2f364c6-cffe-4ff7-9fd9-ce2d9b24ed79",
-            "status": "running"
-        }
-    }
-    ```
-  - **Completed:**
-    ```json
-    {
-        "status": "success",
-        "message":"success",
-        "data": {
-            "task_id": "d2f364c6-cffe-4ff7-9fd9-ce2d9b24ed79",
-            "status": "completed",
-            "evaluation_result_id": "e12345f7-8g9h-10i1-jklm-..."
-        }
-    }
-    ```
-  - **Failed or Not Found:**
-    ```json
-    {
-        "status": "error",
-        "message": "No such task running for task_id: d2f364c6-cffe-4ff7-9fd9-ce2d9b24ed79"
-    }
-    ```
+### 3. Retrieve Evaluation Results
 
-These endpoints provide a complete asynchronous flow for LLM evaluation.
+**Endpoint:** `GET /get-evaluation-result`  
+**Description:** Retrieves the final evaluation results, which include scores, correctness checks, and hallucination analysis.  
+**Required Query Parameter:** `id` (the `evaluation_result_id` returned in the completed task status)  
+
+**Request Example**:
+```
+GET /get-evaluation-result?id=<evaluation_result_id>
+```
+
 
 ---
 
-## Example Usage
+## Example Workflow
 
-**POST** request to start evaluation:
-```sh
-curl --location 'http://127.0.0.1:5000/evaluation/evaluate-llm' \
---header 'Content-Type: application/json' \
---data @request.json
-```
-**GET** request to check status:
-```sh
-curl --location 'http://127.0.0.1:5000/evaluation/task-status/<task_id>'
-```
-**GET** request to retrieve final result:
-```sh
-curl --location 'http://127.0.0.1:5000/evaluation/get-evaluation-result?id=<evaluation_result_id>'
-```
+1. **Initiate Evaluation**  
+   - Send a `POST` to `/evaluate-llm` with your conversation logs and test cases.
+   - Receive a `task_id` in the response.
+
+2. **Check Status**  
+   - Periodically call `GET /task-status/<task_id>`.
+   - If `"task_status": "completed"`, note the `evaluation_result_id`.
+
+3. **Retrieve Results**  
+   - Call `GET /get-evaluation-result?id=<evaluation_result_id>` and review the scoring, correctness, and reasoning data.
 
 ---
 
 ## Contributors
 
-- **Bhupinder** - AI Engineer  
+- **Bhupinder** – AI Engineer  
   - Email: [bhupinder2121221@gmail.com](mailto:bhupinder2121221@gmail.com)  
   - LinkedIn: [Bhupinder's LinkedIn](https://www.linkedin.com/in/bhupinder-bhupinder-473637338/)
 
@@ -320,4 +326,4 @@ curl --location 'http://127.0.0.1:5000/evaluation/get-evaluation-result?id=<eval
 
 ## Thanks
 
-Special thanks to all contributors and developers who helped build this project and evolve it into an asynchronous evaluation system!  
+Special thanks to all contributors and developers who helped build this project into an asynchronous evaluation system!
