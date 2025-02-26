@@ -47,7 +47,7 @@ def run_evaluation_pipeline(
     # scorer = QueryScorer(halucination_threshold=ner_threshold)
 
     # Run pipeline
-    df, steps_in_order, final_score = evaluate(
+    results, steps_in_order, final_score = evaluate(
         conversation_logs=conversation_logs,
         simulation_steps=simulation_steps,
         evaluators=evaluators,
@@ -55,6 +55,6 @@ def run_evaluation_pipeline(
         llm=llm,
         scorer=None # for now Score is Not needed. But pass here Scorer
     )
-    return df, steps_in_order, final_score
+    return results, steps_in_order, final_score
     
 

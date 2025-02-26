@@ -13,6 +13,7 @@ from conversations.conversation_format import InputConversationsFormator
 from config import Config
 from global_variable import BACKGROUND_TASK_COLLECTION, RUNNING_STATUS, TASK_FAILED_STATUS, TASK_COMPLETED_STATUS, DATA_EVALUATING, DATA_PREPROCESSING, DATA_RESULTS_SAVING
 import logging
+from data_model.evaluation import PipelineEvaluationResponse
 config = Config()
 
 
@@ -69,22 +70,25 @@ def llm_black_box_evaluation_task(
                 ner_model=GliNerMODEL(config.GLINER_MODEL).model,
                 algorithms=[EXPECTED_RESPONSE_CHECK]
             )
-
+            unique_id = generate_uuid()
             if not response:
-                results.append(None)
+                results.append(PipelineEvaluationResponse(
+                    id=unique_id,
+                    results=[],
+                    final_score=0,
+                    are_steps_in_order=None
+                ))
             else:
-                df, are_steps_in_order, final_score = response
-                df: pd.DataFrame = df
-                unique_id = generate_uuid()
-                df.to_csv(f"evaluation_reports/{data['use_case']}_{unique_id}.csv")
-                df_json = df.to_json()
-
-                results.append({
-                    "id": unique_id,
-                    "report": df_json,
-                    "score": final_score,
-                    "are_steps_in_order": are_steps_in_order
-                })
+                result, are_steps_in_order, final_score = response
+                
+                
+                
+                results.append(PipelineEvaluationResponse(
+                    id=unique_id,
+                    results=result,
+                    final_score=final_score,
+                    are_steps_in_order=str(are_steps_in_order)
+                ))
                 final_score_avg.append(final_score)
         mongo_service.update_document(
             id=task_id, data = {"task_status": RUNNING_STATUS}
@@ -97,7 +101,7 @@ def llm_black_box_evaluation_task(
         )
         # Save evaluation data
         evaluation_data_service= MongoDBService(db_name=config.MONGO_DATABASE, uri=config.MONGO_URI, collection=config.EVALUATION_COLLECTION)
-        mongo_response = evaluation_data_service.save_evaluation_data(final_score_avg, results)
+        mongo_response = evaluation_data_service.save_evaluation_data(final_score_avg, [result.dict() for result in results])
 
         # Return the result
         mongo_service.update_document(

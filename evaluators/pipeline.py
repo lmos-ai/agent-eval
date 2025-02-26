@@ -2,6 +2,7 @@
 import pandas as pd
 from typing import List, Dict, Any
 from conversations.conversation_format import ConversationEntry
+from data_model.evaluation import ConversationEvaluationResult
 from evaluators.base import BaseEvaluator
 from evaluators.utils_steps_evaluator import StepOrderValidator, validate_conversation_logs, validate_simulation_steps, LLMTriggerMatcher
 from llm.llm import LLMModel
@@ -99,7 +100,9 @@ class PluggableEvaluationPipeline:
                         expected_functions_names=[],
                         llm_result=row_result,
                         matched_step=matched_step)
-                
+                else:
+                    print("[...]    Skipping calculation of the score for conversation cycle as Scorrer passed is None")
+                    row_result["score"] = None
                 # Keep track of the conversation
                 self.results.append(row_result)
                 print("[.] Updating the previous context")
@@ -115,14 +118,41 @@ class PluggableEvaluationPipeline:
             if self.step_validator:
                 print("[.] Validate the order of steps taken in conversation")
                 steps_in_order = self.step_validator.validate_step_order(self.matched_steps)
+            else:
+                print("[...] Skipping Steps Order Validator as Step_validator passed is None.")
+                steps_in_order = "None"
             
             # Attach "steps_in_order" to all results
             for r in self.results:
                 r["steps_in_order"] = steps_in_order
+            
+            
+            results = []
+            for row in self.results:
+                # For any missing columns, Pydantic will fill with None automatically
+                result_model = ConversationEvaluationResult(
+                    query=row.get("query"),
+                    actual_response=row.get("actual_response"),
+                    ner_score=row.get("ner_score"),
+                    ner_halucination_safe_index=row.get("ner_halucination_safe_index"),
+                    ner_keyword_extracted=row.get("ner_keyword_extracted"),
+                    ner_keywords_extracted_matches=row.get("ner_keywords_extracted_matches"),
+                    ner_keywords_extracted_not_matched=row.get("ner_keywords_extracted_not_matched"),
+                    llm_halucinated=str(row.get("llm_halucinated")),
+                    correct_response=str(row.get("correct_response")),
+                    reasoning=row.get("reasoning"),
+                    expected_functions=row.get("expected_functions"),
+                    actual_functions=row.get("actual_functions"),
+                    missing_functions=row.get("missing_functions"),
+                    incorrect_functions=row.get("incorrect_functions"),
+                    function_calls_correct=row.get("function_calls_correct"),
+                    score=row.get("score"),
+                    steps_in_order=row.get("steps_in_order"),
+                )
+            results.append(result_model)
             print("[.] Returning the results of evaluation")
-            # Convert results to DataFrame
-            df = pd.DataFrame(self.results)
-            return df, steps_in_order
+            
+            return results, steps_in_order
         except Exception as e:
             raise RuntimeError(f"Error in pipeline: {e}")
 
@@ -154,7 +184,8 @@ def evaluate(
         trigger_matcher=llm_trigger_matcher
     )
     print("[.] Running the Evaluation pipeline")
-    df, steps_in_order = pipeline.run_pipeline()
+    results, steps_in_order = pipeline.run_pipeline()
     # If you want a final average or something:
-    final_score = df["score"].mean() if "score" in df.columns else None
-    return df, steps_in_order, final_score
+    scores = [row.score for row in results if row.score]
+    final_score = sum(scores)/len(results)
+    return results, steps_in_order, final_score

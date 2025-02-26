@@ -36,7 +36,7 @@ def evaluation_pipeline(conversation_log:dict,
     elif not isinstance(simulation_steps, dict):
         raise Exception("Make sure the simulation_generator is of dict type")
     try:
-        df, are_steps_in_order, final_score = run_evaluation_pipeline(
+        results, are_steps_in_order, final_score = run_evaluation_pipeline(
                                                 algorithms=algorithms,
                                                 ner_threshold=ner_threshold,
                                                 conversation_logs=conversation_log,
@@ -45,7 +45,7 @@ def evaluation_pipeline(conversation_log:dict,
                                                 ner_entities=NER_ENTITIES,
                                                 ner_model=ner_model
                                             )
-        return [df, are_steps_in_order, final_score]
+        return [results, are_steps_in_order, final_score]
     except Exception as e:
         print(f"Got exception while evaluating: {e}")
         return None
