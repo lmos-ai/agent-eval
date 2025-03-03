@@ -169,24 +169,6 @@ swagger_template = {
 swagger = Swagger(app, template=swagger_template)
 
 
-# # Swagger setup
-# SWAGGER_URL = "/swagger"
-# API_URL = "/static/swagger.json"  # Location of swagger.json
-
-# swagger_bp = get_swaggerui_blueprint(
-#     SWAGGER_URL,
-#     API_URL,
-#     config={"app_name": "Black Box Evaluation API"}
-# )
-
-# # Register Swagger blueprint
-# app.register_blueprint(swagger_bp, url_prefix=SWAGGER_URL)
-
-# # Serve swagger.json file
-# @app.route("/static/swagger.json")
-# def serve_swagger():
-#     return send_from_directory("static", "swagger.json")
-
 @app.route("/")
 def index():
     return render_template("index.html")
