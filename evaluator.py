@@ -36,6 +36,7 @@ def evaluation_pipeline(conversation_log:dict,
     elif not isinstance(simulation_steps, dict):
         raise Exception("Make sure the simulation_generator is of dict type")
     try:
+        
         results, are_steps_in_order, final_score = run_evaluation_pipeline(
                                                 algorithms=algorithms,
                                                 ner_threshold=ner_threshold,

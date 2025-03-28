@@ -32,12 +32,13 @@ class LLMHBasedEvaluator(BaseEvaluator):
         print("[.] Passing conversation to evaluators")
         llm_result = self.llm_evaluation.evaluate(
             previous_context=previous_context,
-            query=query,
+            query=query, 
             actual_response=actual_response,
             expected_response=expected_response,
             actual_functions=actual_functions,
             expected_functions=expected_functions
         )
+        
         return {
             "llm_halucinated": llm_result["is_halucinated"],
             "correct_response": llm_result["correct_response"],
