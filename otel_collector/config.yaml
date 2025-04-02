@@ -1,0 +1,27 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+exporters:
+  debug:
+    verbosity: detailed
+  kafka:
+    brokers: ["${KAFKA_BROKER}"]  # this will update the kafka broker endpoint
+    topic: "black-box-eval"  
+    encoding: "otlp_proto"  # Recommended format for OpenTelemetry data
+  
+  
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [debug, kafka]
+    metrics:
+      receivers: [otlp]
+      exporters: [debug]
+    logs:
+      receivers: [otlp]
+      exporters: [debug]

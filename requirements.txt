@@ -14,3 +14,6 @@ marshmallow
 pymongo
 flask-swagger-ui
 flask-cors
+pyyaml
+kafka-python
+opentelemetry-proto
