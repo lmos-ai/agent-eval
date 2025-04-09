@@ -11,7 +11,8 @@ exporters:
   kafka:
     brokers: ["${KAFKA_BROKER}"]  # this will update the kafka broker endpoint
     topic: "black-box-eval"  
-    encoding: "otlp_proto"  # Recommended format for OpenTelemetry data
+    encoding: otlp_proto
+    
   
   
 service:

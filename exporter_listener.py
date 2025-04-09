@@ -1,44 +1,79 @@
 import yaml
 from kafka import KafkaConsumer
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
+import time
+import re, os
 
-def load_config(config_path='otel-config.yaml'):
+def load_config(config_path='otel_collector/config.yaml'):
     """
-    Load OpenTelemetry configuration.
+    Load OpenTelemetry configuration with environment variable substitution.
     """
     with open(config_path, 'r') as f:
-        return yaml.safe_load(f)
+        content = f.read()
+
+    # Substitute environment variables
+    content = re.sub(r'\$\{(\w+)\}', lambda m: os.environ.get(m.group(1), m.group(0)), content)
+
+    return yaml.safe_load(content)
+
 
 def start_kafka_listener(kafka_config):
     """
     Start Kafka consumer and continuously listen for messages.
     """
-    topic = kafka_config.get('topic', 'default-topic')
+    topic = kafka_config.get('topic', 'black-box-eval')
     brokers = kafka_config.get('brokers', ['localhost:9092'])
-
-    # Create Kafka consumer to listen to the topic
-    consumer = KafkaConsumer(
-        topic,
-        bootstrap_servers=brokers,
-        auto_offset_reset='earliest',
-        enable_auto_commit=True,
-        group_id='otel-group'
-    )
-
-    print(f"Kafka Listener started on topic: {topic} with brokers: {brokers}")
-
-    # Continuously listen for messages
+    broker = brokers[0].replace("kafka", "localhost")
+    print(f"Listening to the Kafka Broker: {broker} for topic: {topic}")
     try:
-        for message in consumer:
-            trace_request = ExportTraceServiceRequest()
-            trace_request.ParseFromString(message.value)
+        consumer = KafkaConsumer(
+            "black-box-eval",
+            bootstrap_servers=["localhost:9092"],
+            auto_offset_reset="earliest",
+            enable_auto_commit=False,
+            group_id="otel-test",
+            value_deserializer=lambda m: m,  
+        )
 
-            # Print the trace information from OpenTelemetry data
-            print(f"Received Kafka message: {trace_request}")
+
+        # Explicitly subscribe to topic
+        consumer.subscribe([topic])
+
+        # Wait for partition assignment
+        while not consumer.assignment():
+            print("Waiting for partition assignment...")
+            consumer.poll(timeout_ms=100)
+            time.sleep(1)
+
+        print(f"Assigned partitions: {consumer.assignment()}")
+
+        
+
+        
+        # Continuously listen for messages
+        while True:
+            print("Listening")
+            try:
+                # Listen for new messages indefinitely
+                for message in consumer:
+                    print(f"\n📦 Offset: {message.offset}")
+                    print(f"📨 Raw bytes: {message.value[:60]}...") 
+                    trace_request = ExportTraceServiceRequest()
+                    trace_request.ParseFromString(message.value)
+
+                    # Print the trace information from OpenTelemetry data
+                    print(f"Received Kafka message: {trace_request}")
+                
+            except Exception as e:
+                # Handle errors gracefully, so the listener can continue
+                print(f"Error occurred while listening to Kafka: {str(e)}")
+            # Consumer should keep running until an explicit shutdown occurs
+            # No need to call consumer.close() here, as we want to continue listening.
     except Exception as e:
-        print(f"Error occurred while listening to Kafka: {str(e)}")
-    finally:
-        consumer.close()
+        print(f"Got error while getting the message from Kafka broker: {brokers}. Error: {e}")
+        print("Initializing the Listener again in 10 seconds.")
+        time.sleep(10)
+        init_listener()
 
 def init_listener():
     """
@@ -53,3 +88,6 @@ def init_listener():
         start_kafka_listener(exporters['kafka'])
     else:
         print("Kafka exporter not detected. Listener not started.")
+
+# Initialize the listener
+init_listener()

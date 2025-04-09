@@ -14,7 +14,7 @@ if __name__ == "__main__":
     kafka_thread = threading.Thread(target=init_listener)
     kafka_thread.start()
 
-    # Start FastAPI app (Flask is optional depending on your framework)
+    # Start FastAPI app with uvicorn (No need for flask, we're using FastAPI)
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
 
     # Wait for Kafka listener thread to finish (if needed)

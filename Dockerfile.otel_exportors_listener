@@ -1,0 +1,18 @@
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Install required dependencies
+COPY requirements.txt .
+RUN pip install --upgrade pip && \
+    pip install -r requirements.txt
+
+# Copy the Kafka listener Python script
+COPY exporter_listener.py /app/exporter_listener.py
+COPY otel_collector/ /app/otel_collector/
+
+# Expose any necessary ports (optional for Kafka listener service)
+EXPOSE 8001
+
+# Run the Kafka listener
+CMD ["python", "exporter_listener.py"]

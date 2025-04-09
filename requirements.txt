@@ -17,3 +17,5 @@ flask-cors
 pyyaml
 kafka-python
 opentelemetry-proto
+gunicorn
+
