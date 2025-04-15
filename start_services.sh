@@ -31,6 +31,16 @@ else
     echo "⚠️ Kafka broker is not localhost. Skipping Kafka-related services..."
 fi
 
+
+# Check for MongoDB credentials
+if [[ -n "$MONGO_INITDB_ROOT_USERNAME" && -n "$MONGO_INITDB_ROOT_PASSWORD" ]]; then
+    echo "🟢 MongoDB credentials detected. Starting MongoDB service..."
+    docker-compose up -d mongodb
+else
+    echo "⚠️ MongoDB credentials not fully set. Skipping MongoDB service..."
+fi
+
+
 # Always start evaluation services afterwards
 docker-compose up -d black-box-evaluation otel-collector kafdrop
 
