@@ -22,6 +22,8 @@ class Config(metaclass=SingletonClass):
         self.EVALUATION_COLLECTION = os.environ.get("EVALUATION_COLLECTION")
         self.PREPROCESSED_DATA_COLLECTION = os.environ.get("PREPROCESSED_DATA_COLLECTION")
 
+        
+
         if self.model_source.upper() == AZURE_LLM:
             self.MODEL_SOURCE = AZURE_LLM
         elif self.model_source.upper() == OPENAI_LLM:

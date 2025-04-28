@@ -3,6 +3,11 @@ from kafka import KafkaConsumer
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
 import time
 import re, os
+from helper_functions.mongo_utils import MongoDBService
+from global_variable import OPENTELEMETRY_TRACES_COLLECTION
+from config import Config
+
+config = Config()
 
 def load_config(config_path='otel_collector/config.yaml'):
     """
@@ -47,9 +52,7 @@ def start_kafka_listener(kafka_config):
 
         print(f"Assigned partitions: {consumer.assignment()}")
 
-        
-
-        
+        mongo_srv = MongoDBService(db_name=config.MONGO_DATABASE, collection=OPENTELEMETRY_TRACES_COLLECTION, uri=config.MONGO_URI)
         # Continuously listen for messages
         while True:
             print("Listening")
@@ -63,6 +66,10 @@ def start_kafka_listener(kafka_config):
 
                     # Print the trace information from OpenTelemetry data
                     print(f"Received Kafka message: {trace_request}")
+                    # TODO
+                    # format the traces
+                    # save the traces to the database.
+
                 
             except Exception as e:
                 # Handle errors gracefully, so the listener can continue

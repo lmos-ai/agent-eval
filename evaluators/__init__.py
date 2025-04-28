@@ -44,7 +44,7 @@ def run_evaluation_pipeline(
     # step_validator = StepOrderValidator(simulation_steps)
 
     # add Scorer
-    # scorer = QueryScorer(halucination_threshold=ner_threshold)
+    scorer = QueryScorer(halucination_threshold=ner_threshold)
 
     # Run pipeline
     results, steps_in_order, final_score = evaluate(

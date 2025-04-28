@@ -1,6 +1,8 @@
 from pymongo import MongoClient
 import json
 from uuid import uuid4
+from urllib.parse import quote_plus
+
 
 class MongoDBService:
     def __init__(self, db_name:str, collection:str, uri:str="mongodb://localhost:27017/"):

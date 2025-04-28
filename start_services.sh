@@ -1,46 +1,75 @@
 #!/bin/bash
 
-CONFIG_TEMPLATE="otel_collector/config.yaml"
-FINAL_CONFIG_PATH="otel_collector/otel-config-final.yaml"
-
-# Check required environment variables
-if [ -z "$KAFKA_BROKER" ]; then
-    echo "❌ Error: KAFKA_BROKER environment variable not set."
+# Load .env safely
+ENV_FILE=".env"
+if [ ! -f "$ENV_FILE" ]; then
+    echo "❌ Error: .env file not found!"
     exit 1
 fi
 
-export KAFKA_BROKER
+set -o allexport
+source "$ENV_FILE"
+set +o allexport
 
-# Generate substituted YAML file explicitly
+echo "✅ Environment variables freshly loaded from $ENV_FILE:"
+grep -v '^#' "$ENV_FILE"
+
+CONFIG_TEMPLATE="otel_collector/config.yaml"
+FINAL_CONFIG_PATH="otel_collector/otel-config-final.yaml"
+
+# Substitute variables
 envsubst < "$CONFIG_TEMPLATE" > "$FINAL_CONFIG_PATH"
 echo "✅ Substituted config generated at $FINAL_CONFIG_PATH"
 
-# Build Docker containers without cache
+# Build docker images
 docker-compose build --no-cache
 
 echo "Kafka broker is $KAFKA_BROKER"
-# Check directly if Kafka broker points to localhost
+
+# Start Kafka if localhost
 if [[ "$KAFKA_BROKER" == *"kafka"* ]]; then
     echo "🚀 Kafka broker is localhost. Starting Kafka, Zookeeper, and Kafdrop..."
     docker-compose up -d kafka zookeeper
 
-    # Give Kafka time to initialize
     echo "⏳ Waiting for Kafka services to start (10s)..."
     sleep 10
 else
-    echo "⚠️ Kafka broker is not localhost. Skipping Kafka-related services..."
+    echo "⚠️ Kafka broker is not localhost. Skipping Kafka services."
 fi
 
+# 🛠 Mongo Check Section
+echo "MongoURI just before MongoDB check: $MONGO_URI"
 
-# Check for MongoDB credentials
-if [[ -n "$MONGO_INITDB_ROOT_USERNAME" && -n "$MONGO_INITDB_ROOT_PASSWORD" ]]; then
-    echo "🟢 MongoDB credentials detected. Starting MongoDB service..."
-    docker-compose up -d mongodb
+if [ -n "$MONGO_URI" ]; then
+    echo "🟢 External MongoDB URI detected. Skipping local MongoDB container startup."
 else
-    echo "⚠️ MongoDB credentials not fully set. Skipping MongoDB service..."
+    echo "⚠️ No external Mongo URI found. Starting local MongoDB..."
+
+    # Generate random Mongo credentials
+    export MONGO_INITDB_ROOT_USERNAME="user_$(openssl rand -hex 3)"
+    export MONGO_INITDB_ROOT_PASSWORD="$(openssl rand -hex 8)"
+
+    # Save Mongo credentials into a temp file
+    echo "MONGO_INITDB_ROOT_USERNAME=$MONGO_INITDB_ROOT_USERNAME" > .mongo_secrets.env
+    echo "MONGO_INITDB_ROOT_PASSWORD=$MONGO_INITDB_ROOT_PASSWORD" >> .mongo_secrets.env
+
+    # Construct MONGO_URI and save it
+    export MONGO_URI="mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@localhost:27017/"
+    echo "MONGO_URI=$MONGO_URI" >> .mongo_secrets.env
+
+    # Start MongoDB service with env file
+    docker-compose --env-file .mongo_secrets.env up -d mongo-db
+
+    echo "✅ Local MongoDB started with random credentials."
 fi
 
+# Reload new Mongo vars into the environment (important)
+if [ -f ".mongo_secrets.env" ]; then
+    set -o allexport
+    source ".mongo_secrets.env"
+    set +o allexport
+    echo "✅ Loaded generated MongoDB credentials into environment."
+fi
 
-# Always start evaluation services afterwards
-docker-compose up -d black-box-evaluation otel-collector kafdrop
-
+# Start the rest of services
+docker-compose up -d black-box-evaluation otel-collector kafdrop exportor_services

@@ -1,0 +1,28 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+exporters:
+  debug:
+    verbosity: detailed
+  kafka:
+    brokers: ["kafka:9092"]  # this will update the kafka broker endpoint
+    topic: "black-box-eval"  
+    encoding: otlp_proto
+    
+  
+  
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [debug, kafka]
+    metrics:
+      receivers: [otlp]
+      exporters: [debug]
+    logs:
+      receivers: [otlp]
+      exporters: [debug]

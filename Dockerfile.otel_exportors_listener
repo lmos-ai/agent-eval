@@ -10,9 +10,12 @@ RUN pip install --upgrade pip && \
 # Copy the Kafka listener Python script
 COPY exporter_listener.py /app/exporter_listener.py
 COPY otel_collector/ /app/otel_collector/
-
+COPY helper_functions/ /app/helper_functions
+COPY global_variable.py /app/global_variable.py
+COPY config.py /app/config.py
 # Expose any necessary ports (optional for Kafka listener service)
 EXPOSE 8001
 
 # Run the Kafka listener
-CMD ["python", "exporter_listener.py"]
+CMD ["python", "-u", "exporter_listener.py"]
+
