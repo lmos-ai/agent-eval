@@ -2,3 +2,4 @@ venv/
 .env
 *.pyc
 *.csv
+.mongo_secrets.env

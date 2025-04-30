@@ -62,6 +62,7 @@ services:
         condition: service_healthy
     env_file:
       - .env
+      - .mongo_secrets.env
     networks:
       - kafka-net
   
@@ -75,6 +76,7 @@ services:
     restart: always
     env_file:
       - .env
+      - .mongo_secrets.env
 
   mongo-db:
     image: mongo:latest
@@ -86,11 +88,25 @@ services:
       - mongodb_data:/data/db
     networks:
       - kafka-net
+    env_file:
+      - .env
+      - .mongo_secrets.env
+
+  mongo-express:
+    image: mongo-express
+    container_name: mongo-express
+    ports:
+      - "8081:8081"
+    depends_on:
+      - mongo-db
+    env_file:
+      - .mongo_secrets.env
     environment:
-      MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: root
-
-
+      ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      ME_CONFIG_MONGODB_URL: ${MONGO_URI}
+    networks:
+      - kafka-net
 
   black-box-evaluation:
     build:
