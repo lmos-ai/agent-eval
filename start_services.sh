@@ -54,11 +54,14 @@ else
     echo "MONGO_INITDB_ROOT_PASSWORD=$MONGO_INITDB_ROOT_PASSWORD" >> .mongo_secrets.env
 
     # Construct MONGO_URI and save it
-    export MONGO_URI="mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@localhost:27017/"
+    export MONGO_URI="mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongodb:27017/"
+    echo "Mongo URI $MONGO_URI"
+
     echo "MONGO_URI=$MONGO_URI" >> .mongo_secrets.env
 
+
     # Start MongoDB service with env file
-    docker-compose --env-file .mongo_secrets.env up -d mongo-db
+    docker-compose --env-file .mongo_secrets.env up -d mongo-db mongo-express
 
     echo "✅ Local MongoDB started with random credentials."
 fi
